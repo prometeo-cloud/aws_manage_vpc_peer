@@ -1,0 +1,17 @@
+---
+- name: Peer VPCs
+  include_tasks: peering_connection_create.yml
+  with_items:
+    - "{{ aws_vpc_peers }}"
+  loop_control:
+    loop_var: vpc_peer
+  when: (arg_action is not defined) or (arg_action != 'delete')
+
+- name: Delete peering connections
+  include_tasks: peering_connection_delete.yml
+  with_items:
+    - "{{ aws_vpc_peers }}"
+  loop_control:
+    loop_var: vpc_peer
+  when: (arg_action is defined) and (arg_action == 'delete')
+...

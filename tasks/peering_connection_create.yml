@@ -1,0 +1,51 @@
+---
+- name: Get peering connection information
+  include_role:
+    name: aws_manage_vpc_peer
+    tasks_from: get_vpc_peering_connection_facts
+  vars:
+    vpc_pc_tag: "{{ vpc_peer.aws_vpc_pc_name }}"
+
+- block:
+    - name: Get VPC Information
+      include_role:
+        name: "aws_manage_vpc"
+        tasks_from: "get_vpc_facts"
+      vars:
+        vpc_tag: "{{ vpc_peer.aws_vpc_tag }}"
+
+    - name: Get VPC ID
+      set_fact:
+        aws_vpc_id: "{{ vpc_net_facts.vpcs[0].id }}"
+
+    - name: Get VPC Information
+      include_role:
+        name: "aws_manage_vpc"
+        tasks_from: "get_vpc_facts"
+      vars:
+        vpc_tag: "{{ vpc_peer.aws_vpc_peer_tag }}"
+
+    - name: Get peer VPC ID
+      set_fact:
+        aws_peer_vpc_id: "{{ vpc_net_facts.vpcs[0].id }}"
+
+    - name: Peer VPC {{ vpc_peer.aws_vpc_tag }} with {{ vpc_peer.aws_vpc_peer_tag }}
+      ec2_vpc_peer:
+        region: "{{ vpc_peer.aws_vpc_region }}"
+        vpc_id: "{{ aws_vpc_id }}"
+        peer_vpc_id: "{{ aws_peer_vpc_id }}"
+        state: present
+        tags: "{{ vpc_peer.aws_vpc_pc_tags | default(omit) }}"
+      register: request_peer
+
+    - name: Accept VPC peering request
+      ec2_vpc_peer:
+        region: "{{ vpc_peer.aws_vpc_region }}"
+        peering_id: "{{ request_peer.peering_id }}"
+        state: accept
+        tags: "{{ vpc_peer.aws_vpc_pc_tags | default(omit) }}"
+
+    - name: Update Name tag value
+      command: "aws ec2 create-tags --resources {{ request_peer.peering_id }} --tags Key=\"Name\",Value=\"{{ vpc_peer.aws_vpc_pc_name | upper }}\""
+  when: vpc_peering_facts.result == []
+...
